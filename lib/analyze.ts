@@ -7,7 +7,7 @@ import { analysisJsonSchema, parseAnalysis, type Analysis } from "./schema";
  * JSON via structured outputs.
  *
  * Best practices applied (per the current Anthropic SDK guidance):
- *  - Default model `claude-opus-4-8` (override with ANALYSIS_MODEL).
+ *  - Default model `claude-haiku-4-5-20251001` (override with ANALYSIS_MODEL).
  *  - Adaptive thinking (effort defaults to "high") for careful diffing.
  *  - Structured outputs via `output_config.format` (JSON Schema), then
  *    validated with Zod on our side.
