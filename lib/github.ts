@@ -19,6 +19,8 @@ const SOURCE_EXTENSIONS = [
   ".cjs",
 ];
 
+const PYTHON_SOURCE_EXTENSIONS = [".py", ".pyi"];
+
 const EXCLUDE_PATTERNS = [
   /(^|\/)node_modules\//,
   /(^|\/)dist\//,
@@ -175,6 +177,41 @@ function isSourceFile(path: string): boolean {
   return SOURCE_EXTENSIONS.some((ext) => path.endsWith(ext));
 }
 
+const PYTHON_EXCLUDE_PATTERNS = [
+  /(^|\/)__pycache__\//,
+  /(^|\/)\.venv\//,
+  /(^|\/)(venv|env)\//,
+  /(^|\/)dist\//,
+  /(^|\/)build\//,
+  /(^|\/)test(s)?\//,
+  /\/test_[^/]+\.py$/,
+  /\/[^/]+_test\.py$/,
+  /\bconftest\.py$/,
+];
+
+function isPythonSourceFile(path: string): boolean {
+  if (PYTHON_EXCLUDE_PATTERNS.some((re) => re.test(path))) return false;
+  return PYTHON_SOURCE_EXTENSIONS.some((ext) => path.endsWith(ext));
+}
+
+function scorePythonFile(path: string): number {
+  let score = 0;
+  const name = basename(path).toLowerCase();
+  const depth = path.split("/").length;
+
+  // .pyi stubs are pure type declarations — the cleanest API surface.
+  if (path.endsWith(".pyi")) score += 30;
+
+  // Conventional public-surface filenames.
+  if (/^(__init__|api|client|sdk|core|main)\./.test(name)) score += 25;
+
+  if (/(^|\/)src\//.test(path)) score += 10;
+  if (/(^|\/)lib\//.test(path)) score += 4;
+  score -= depth * 2;
+
+  return score;
+}
+
 export interface FetchSurfaceOptions {
   fetchImpl?: FetchLike;
   maxFiles?: number;
@@ -233,6 +270,9 @@ export async function fetchRepoApiSurface(
     language: (meta.language as string) ?? null,
   };
 
+  const isPython =
+    ((meta.language as string) ?? "").toLowerCase() === "python";
+
   // 2. Recursive tree of the branch.
   const treeRes = await fetchImpl(
     `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(
@@ -248,9 +288,9 @@ export async function fetchRepoApiSurface(
   const treeJson = (await treeRes.json()) as { tree?: TreeEntry[] };
   const tree = treeJson.tree ?? [];
 
-  // 3. Optionally read package.json to find declared entry points.
+  // 3. Optionally read package.json to find declared entry points (TS/JS only).
   let entryPoints = new Set<string>();
-  if (tree.some((t) => t.path === "package.json")) {
+  if (!isPython && tree.some((t) => t.path === "package.json")) {
     try {
       const pkgRes = await fetchImpl(rawUrl(owner, repo, branch, "package.json"));
       if (pkgRes.ok) {
@@ -264,15 +304,26 @@ export async function fetchRepoApiSurface(
 
   // 4. Rank and select source files.
   const candidates = tree
-    .filter((t) => t.type === "blob" && isSourceFile(t.path))
+    .filter(
+      (t) =>
+        t.type === "blob" &&
+        (isPython ? isPythonSourceFile(t.path) : isSourceFile(t.path)),
+    )
     .filter((t) => (t.size ?? 0) <= maxFileBytes)
-    .map((t) => ({ ...t, score: scoreFile(t.path, entryPoints) }))
+    .map((t) => ({
+      ...t,
+      score: isPython
+        ? scorePythonFile(t.path)
+        : scoreFile(t.path, entryPoints),
+    }))
     .sort((a, b) => b.score - a.score)
     .slice(0, maxFiles);
 
   if (candidates.length === 0) {
     throw new Error(
-      `No TypeScript/JavaScript source files found in ${owner}/${repo}. docsParity targets TS/JS libraries.`,
+      isPython
+        ? `No Python source files found in ${owner}/${repo}.`
+        : `No TypeScript/JavaScript source files found in ${owner}/${repo}. docsParity targets TS/JS libraries.`,
     );
   }
 
