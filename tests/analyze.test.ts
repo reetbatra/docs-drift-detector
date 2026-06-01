@@ -68,11 +68,8 @@ describe("analyzeDrift", () => {
     // Structured outputs configured.
     const outputConfig = captured.output_config as {
       format?: { type?: string };
-      effort?: string;
     };
     expect(outputConfig.format?.type).toBe("json_schema");
-    expect(outputConfig.effort).toBe("high");
-    expect(captured.thinking).toEqual({ type: "adaptive" });
 
     // The large code & docs blocks are marked for prompt caching.
     const messages = captured.messages as Array<{

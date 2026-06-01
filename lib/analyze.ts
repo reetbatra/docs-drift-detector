@@ -8,7 +8,6 @@ import { analysisJsonSchema, parseAnalysis, type Analysis } from "./schema";
  *
  * Best practices applied (per the current Anthropic SDK guidance):
  *  - Default model `claude-haiku-4-5-20251001` (override with ANALYSIS_MODEL).
- *  - Adaptive thinking (effort defaults to "high") for careful diffing.
  *  - Structured outputs via `output_config.format` (JSON Schema), then
  *    validated with Zod on our side.
  *  - Prompt caching (`cache_control: ephemeral`) on the large code/docs blocks
@@ -71,13 +70,8 @@ export async function analyzeDrift(args: AnalyzeArgs): Promise<AnalyzeResult> {
 
   const stream = client.messages.stream({
     model,
-    max_tokens: 16000,
-    // Adaptive thinking lets Claude decide how hard to think per request; we
-    // pin effort to "high" (inside output_config, where the SDK accepts it) for
-    // careful code-vs-docs diffing.
-    thinking: { type: "adaptive" },
+    max_tokens: 4096,
     output_config: {
-      effort: "high",
       format: {
         type: "json_schema",
         schema: analysisJsonSchema,
