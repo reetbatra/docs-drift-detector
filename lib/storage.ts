@@ -5,6 +5,17 @@ import type { DriftReport } from "./types";
 export interface ReportSummary {
   id: string;
   uploadedAt: Date;
+  repoFullName: string;
+  repoUrl: string;
+  docsUrl: string;
+  driftScore: number;
+  scoreLabel: string;
+  coverageScore: number;
+  mismatchCount: number;
+  highCount: number;
+  mediumCount: number;
+  lowCount: number;
+  language: string | null;
 }
 
 /**
@@ -16,6 +27,28 @@ export interface ReportSummary {
  */
 
 const PREFIX = "reports";
+
+function toSummary(id: string, uploadedAt: Date, report: DriftReport): ReportSummary {
+  const counts = report.mismatches.reduce(
+    (acc, m) => { acc[m.severity] = (acc[m.severity] ?? 0) + 1; return acc; },
+    { high: 0, medium: 0, low: 0 } as Record<string, number>,
+  );
+  return {
+    id,
+    uploadedAt,
+    repoFullName: report.repo.fullName,
+    repoUrl: report.input.repoUrl,
+    docsUrl: report.input.docsUrl,
+    driftScore: report.driftScore,
+    scoreLabel: report.scoreLabel,
+    coverageScore: report.coverageScore ?? 0,
+    mismatchCount: report.mismatches.length,
+    highCount: counts.high ?? 0,
+    mediumCount: counts.medium ?? 0,
+    lowCount: counts.low ?? 0,
+    language: report.repo.language,
+  };
+}
 
 function hasBlob(): boolean {
   return !!process.env.BLOB_READ_WRITE_TOKEN;
@@ -80,12 +113,21 @@ export async function listReports(): Promise<ReportSummary[]> {
       prefix: `${PREFIX}/`,
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
-    return blobs
-      .map((b) => ({
-        id: b.pathname.replace(`${PREFIX}/`, "").replace(".json", ""),
-        uploadedAt: new Date(b.uploadedAt),
-      }))
-      .sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime());
+    const summaries = await Promise.all(
+      blobs.map(async (b) => {
+        const id = b.pathname.replace(`${PREFIX}/`, "").replace(".json", "");
+        try {
+          const res = await fetch(b.url, { cache: "no-store" });
+          if (!res.ok) return null;
+          return toSummary(id, new Date(b.uploadedAt), (await res.json()) as DriftReport);
+        } catch {
+          return null;
+        }
+      }),
+    );
+    return (summaries.filter(Boolean) as ReportSummary[]).sort(
+      (a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime(),
+    );
   }
 
   try {
@@ -95,13 +137,15 @@ export async function listReports(): Promise<ReportSummary[]> {
       files
         .filter((f) => f.endsWith(".json"))
         .map(async (f) => {
-          const stat = await fs.stat(path.join(dir, f));
-          return { id: f.replace(".json", ""), uploadedAt: stat.mtime };
+          const filePath = path.join(dir, f);
+          const [data, stat] = await Promise.all([
+            fs.readFile(filePath, "utf8"),
+            fs.stat(filePath),
+          ]);
+          return toSummary(f.replace(".json", ""), stat.mtime, JSON.parse(data) as DriftReport);
         }),
     );
-    return summaries.sort(
-      (a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime(),
-    );
+    return summaries.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime());
   } catch {
     return [];
   }

@@ -16,6 +16,7 @@ export function MismatchCard({
   index: number;
 }) {
   const [copied, setCopied] = useState(false);
+  const [copiedFix, setCopiedFix] = useState(false);
 
   const copyMarkdown = async () => {
     try {
@@ -88,6 +89,23 @@ export function MismatchCard({
         >
           {copied ? "Copied ✓" : "Copy as Markdown"}
         </button>
+        {mismatch.suggested_fix && (
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(mismatch.suggested_fix!);
+                setCopiedFix(true);
+                setTimeout(() => setCopiedFix(false), 1500);
+              } catch {
+                /* clipboard unavailable */
+              }
+            }}
+            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-700/40 bg-emerald-500/[0.06] px-3 py-1.5 text-xs font-medium text-emerald-300 transition-colors hover:bg-emerald-500/10"
+          >
+            {copiedFix ? "Fix copied ✓" : "Copy fix"}
+          </button>
+        )}
         <span className="ml-auto text-xs text-zinc-600">
           {Math.round(mismatch.confidence * 100)}% confidence
         </span>

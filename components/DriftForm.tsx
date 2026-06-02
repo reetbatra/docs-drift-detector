@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   PIPELINE_STEPS,
   type DriftReport,
@@ -19,9 +19,17 @@ function initialStates(): Record<PipelineStep, StepState> {
   ) as Record<PipelineStep, StepState>;
 }
 
-export function DriftForm() {
-  const [repoUrl, setRepoUrl] = useState("");
-  const [docsUrl, setDocsUrl] = useState("");
+export function DriftForm({
+  initialRepoUrl = "",
+  initialDocsUrl = "",
+  autoRun = false,
+}: {
+  initialRepoUrl?: string;
+  initialDocsUrl?: string;
+  autoRun?: boolean;
+}) {
+  const [repoUrl, setRepoUrl] = useState(initialRepoUrl);
+  const [docsUrl, setDocsUrl] = useState(initialDocsUrl);
   const [status, setStatus] = useState<Status>("idle");
   const [states, setStates] = useState(initialStates);
   const [details, setDetails] = useState<
@@ -30,6 +38,15 @@ export function DriftForm() {
   const [report, setReport] = useState<DriftReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const didAutoRun = useRef(false);
+
+  useEffect(() => {
+    if (autoRun && initialRepoUrl && initialDocsUrl && !didAutoRun.current) {
+      didAutoRun.current = true;
+      run(initialRepoUrl, initialDocsUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const running = status === "running";
 

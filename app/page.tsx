@@ -1,6 +1,13 @@
 import { DriftForm } from "@/components/DriftForm";
 
-export default function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ repoUrl?: string; docsUrl?: string }>;
+}) {
+  const { repoUrl, docsUrl } = await searchParams;
+  const autoRun = !!(repoUrl && docsUrl);
+
   return (
     <div className="space-y-16">
       {/* Hero */}
@@ -22,7 +29,11 @@ export default function Home() {
       </section>
 
       {/* The tool */}
-      <DriftForm />
+      <DriftForm
+        initialRepoUrl={repoUrl ?? ""}
+        initialDocsUrl={docsUrl ?? ""}
+        autoRun={autoRun}
+      />
 
       {/* The problem */}
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 sm:p-8">

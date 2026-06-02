@@ -41,12 +41,18 @@ export default async function ReportPage({
   return (
     <div className="space-y-6">
       <ReportView report={report} />
-      <div className="text-center">
+      <div className="flex flex-wrap items-center justify-center gap-3">
         <Link
-          href="/"
+          href={`/?repoUrl=${encodeURIComponent(report.input.repoUrl)}&docsUrl=${encodeURIComponent(report.input.docsUrl)}`}
           className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-emerald-950 transition-colors hover:bg-emerald-400"
         >
-          Check your own repo →
+          Re-analyze →
+        </Link>
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 px-5 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:border-emerald-500 hover:text-emerald-300"
+        >
+          Check a different repo
         </Link>
       </div>
     </div>
